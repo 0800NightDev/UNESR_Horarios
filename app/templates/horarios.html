@@ -1,0 +1,166 @@
+{% extends "base.html" %}{% block content %}
+<h2>Horarios por carrera y día</h2>
+<p class="sub">Elija una carrera para ver su cuadro de clases por día y hora. La cuadrícula se muestra solo para una carrera a la vez.</p>
+
+<form method="get" action="/horarios" class="card" role="search">
+  <div class="row">
+    <div style="min-width:280px;flex:1"><label for="carrera_id">Carrera *</label>
+      <select id="carrera_id" name="carrera_id" onchange="this.form.submit()" style="width:100%" required>
+        <option value="" {% if not carrera_id %}selected{% endif %}>— Seleccione una carrera —</option>
+        {% for c in carreras %}<option value="{{ c.id }}" {% if carrera_id==c.id %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+      </select></div>
+    <div><label for="filtro-dia">Día</label><select id="filtro-dia" name="dia"><option value="">Todos</option>
+      {% for d in dias %}<option value="{{ d }}" {% if dia==d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+    <div style="min-width:200px"><label for="filtro-profesor">Docente</label><select id="filtro-profesor" name="profesor_id"><option value="">Todos</option>
+      {% for p in profesores %}<option value="{{ p.id }}" {% if profesor_id==p.id %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}</select></div>
+    <div><button class="btn btn-primary">Filtrar</button></div>
+    {% if carrera_id %}<div><a class="btn btn-light" href="/horarios?carrera_id={{ carrera_id }}">Limpiar filtros</a></div>{% endif %}
+  </div>
+</form>
+
+{% if cuadro %}
+<div class="card">
+{% if estado.sin_clases %}
+  <div class="estado-pensum">
+    <h3>{{ carrera.nombre }} <span class="badge">{{ carrera.facultad }}</span></h3>
+    {% if estado.pensum %}
+      <p><b>El pensum sí está cargado:</b> {{ estado.materias_pensum }} unidades curriculares
+        ({{ estado.total_uc }} U.C.), pero <b>no hay docentes asignados</b> para impartirlas.
+        Por eso el cuadro de horarios está vacío.</p>
+      <p class="sub">Los PDF de los PNF contienen la malla curricular, no fichas docentes.
+        Asigne docentes desde <a href="/nueva-carga">Nueva Carga</a> (ficha individual o carga
+        múltiple) para que el sistema genere las clases automáticamente.</p>
+      <details>
+        <summary>Materias del pensum pendientes de asignar ({{ estado.pendientes|length }})</summary>
+        <div class="pendientes">
+          {% for m in estado.pendientes %}
+          <div><span class="badge">{{ m.codigo }}</span> {{ m.nombre }}
+            {% if m.ciclo %}<small>· {{ m.ciclo }}</small>{% endif %}
+            {% if m.unidad_credito %}<small>· {{ m.unidad_credito }} UC</small>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+    {% else %}
+      <p><b>Esta carrera aún no tiene pensum cargado.</b> Impórtelo desde
+        <a href="/carreras">Carreras y pensum</a>.</p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="vista-head">
+    <div>
+      <h3>{{ carrera.nombre }} <span class="badge">{{ carrera.facultad }}</span></h3>
+      <p class="sub" style="margin:0">{{ cuadro.total }} clase(s) programada(s) en esta carrera.</p>
+    </div>
+    <div class="tabs" role="group" aria-label="Vista del horario">
+      <button type="button" class="tab activa" id="tab-cuadro" aria-pressed="true" onclick="cambiarVista('cuadro')">▦ Cuadro</button>
+      <button type="button" class="tab" id="tab-lista" aria-pressed="false" onclick="cambiarVista('lista')">☰ Lista</button>
+    </div>
+  </div>
+
+  <div id="vista-cuadro">
+    {% if cuadro.franjas %}
+    <div class="cuadro-scroll">
+      <table class="cuadro" aria-label="Cuadro de horarios de {{ carrera.nombre }}">
+        <thead><tr><th scope="col" class="col-hora">Hora</th>
+          {% for d in cuadro.dias %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for ini, fin in cuadro.franjas %}
+          <tr><th scope="row" class="col-hora">{{ ini }}<small>{{ fin }}</small></th>
+            {% for d in cuadro.dias %}
+              <td class="celda">
+                {% for f in cuadro.celdas[d][ini] %}
+                <div class="clase {% if f.id in conflictos_por_id %}conflicto{% endif %}">
+                  <b title="{{ f.materia }}">{{ f.materia }}</b>
+                  <span>{{ f.profesor }}</span>
+                  <span class="badge {% if f.estado=='Manual' %}warn{% else %}ok{% endif %}">{{ f.ambiente }}</span>
+                  {% if f.seccion %}<small>{{ f.seccion }}</small>{% endif %}
+                  {% if f.id in conflictos_por_id %}<small class="motivo-conflicto">⚠ {{ conflictos_por_id[f.id] }}</small>{% endif %}
+                </div>
+                {% endfor %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="empty">No hay clases asignadas para los filtros seleccionados.</p>
+    {% endif %}
+  </div>
+
+  <div id="vista-lista" hidden>
+    {% set hay = false %}
+    {% for dia, filas in por_dia.items() %}
+      {% if filas %}
+        {% set hay = true %}
+        <div class="dia"><span>{{ dia }}</span><span class="badge">{{ filas|length }} clase(s)</span></div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Docente</th><th>Materia</th><th>Código</th><th>Sección</th><th>Horario</th><th>Ambiente</th><th>Estado</th><th>Colisión</th></tr></thead>
+          <tbody>{% for f in filas %}<tr {% if f.id in conflictos_por_id %}class="fila-conflicto"{% endif %}>
+            <td><b>{{ f.profesor }}</b></td><td>{{ f.materia }}</td><td>{{ f.codigo }}</td><td>{{ f.seccion }}</td>
+            <td>{{ f.hora_inicio }}–{{ f.hora_fin }}</td><td><span class="badge ok">{{ f.ambiente }}</span></td>
+            <td><span class="badge {% if f.estado=='Manual' %}warn{% endif %}">{{ f.estado }}</span></td>
+            <td>{% if f.id in conflictos_por_id %}<span class="badge bad">⚠ {{ conflictos_por_id[f.id] }}</span>{% else %}—{% endif %}</td>
+          </tr>{% endfor %}</tbody>
+        </table></div>
+      {% endif %}
+    {% endfor %}
+    {% if not hay %}<p class="empty">No hay clases asignadas para los filtros seleccionados.</p>{% endif %}
+  </div>
+{% endif %}
+</div>
+{% else %}
+<div class="card">
+  <p class="empty">Seleccione una carrera para ver su horario en cuadro.</p>
+</div>
+{% endif %}
+
+{% macro form_reasignar(f, etiqueta) %}
+<form method="post" action="/reasignar/{{ f.id }}" class="acciones-form">
+  <span class="badge bad">{{ etiqueta }}</span>
+  <label>Ambiente<select name="salon_id">{% for s in ambientes %}<option value="{{ s.id }}" {% if s.codigo==f.ambiente %}selected{% endif %}>{{ s.codigo }}</option>{% endfor %}</select></label>
+  <label>Día<select name="dia">{% for d in dias %}<option value="{{ d }}" {% if d==f.dia %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
+  <label>Desde<input type="time" name="hora_inicio" value="{{ f.hora_inicio }}"></label>
+  <label>Hasta<input type="time" name="hora_fin" value="{{ f.hora_fin }}"></label>
+  <button class="btn btn-warn">Reasignar {{ etiqueta }}</button>
+</form>
+{% endmacro %}
+
+<details class="conflictos" {% if conflictos_carrera %}open{% endif %}>
+  <summary>⚠ Colisiones de esta carrera ({{ conflictos_carrera|length }}) — motivos y reasignación manual</summary>
+  <p class="sub">Las clases en rojo del cuadro son las que aparecen aquí. Reasignar una clase
+    la marca como <b>Manual</b>: la regeneración automática posterior la respetará.</p>
+  {% if conflictos_carrera %}
+  <div style="overflow-x:auto"><table class="tabla-conflictos">
+    <thead><tr><th>Motivo</th><th>Qué ocurre</th><th>Reasignar</th></tr></thead>
+    <tbody>{% for c in conflictos_carrera %}<tr class="fila-conflicto">
+      <td><span class="badge bad">{{ c.motivo }}</span><br><small>{{ c.dia }} {{ c.desde }}–{{ c.hasta }}</small></td>
+      <td><small>{{ c.detalle }}</small></td>
+      <td>{{ form_reasignar(c.a, 'A') }}{{ form_reasignar(c.b, 'B') }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}
+  <p class="empty">Esta carrera no tiene colisiones actualmente.</p>
+  {% endif %}
+</details>
+
+<div class="card">
+  <h3>Reasignación automática</h3>
+  <form method="post" action="/asignar-auto"><button class="btn btn-warn">⚙ Volver a asignar todo automáticamente</button></form>
+  <p class="sub">El generador elimina colisiones, pero puede dejar clases pendientes si no hay
+    ambientes libres o hay horas fijas. Use el panel de arriba para esos casos.</p>
+</div>
+
+<script>
+function cambiarVista(cual) {
+  const esCuadro = cual === 'cuadro';
+  document.getElementById('vista-cuadro').hidden = !esCuadro;
+  document.getElementById('vista-lista').hidden = esCuadro;
+  const a = document.getElementById('tab-cuadro'), b = document.getElementById('tab-lista');
+  a.classList.toggle('activa', esCuadro); b.classList.toggle('activa', !esCuadro);
+  a.setAttribute('aria-pressed', String(esCuadro)); b.setAttribute('aria-pressed', String(!esCuadro));
+}
+</script>
+{% endblock %}

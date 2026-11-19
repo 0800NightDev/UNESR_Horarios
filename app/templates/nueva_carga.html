@@ -1,0 +1,192 @@
+{% extends "base.html" %}{% block content %}
+<h2>Nueva Carga</h2>
+<p class="sub">Registre una ficha o varias materias en una sola carga. El sistema valida los conflictos antes de guardar y asigna los ambientes automáticamente.</p>
+{% set patron_cedula = '[VEve][ -]?[0-9]{1,3}([.][0-9]{3}){1,2}|[VEve]-?[0-9]{7,8}' %}
+
+<div class="card">
+  <h3>Ficha individual</h3>
+  <p class="sub">Un docente, una materia y su disponibilidad.</p>
+  <form method="post" action="/nueva-carga">
+    <div class="row">
+      <div style="flex:2;min-width:240px"><label for="profesor">Docente *</label>
+        <input id="profesor" name="profesor" list="lista_prof" required value="{{ form.get('profesor','') }}" style="width:100%" placeholder="Nombre y apellidos">
+        <datalist id="lista_prof">{% for p in opciones.profesores %}<option value="{{ p }}">{% endfor %}</datalist></div>
+      <div style="flex:1;min-width:180px"><label>Cédula</label><input name="cedula" value="{{ form.get('cedula','') }}" pattern="{{ patron_cedula }}" title="Ej.: V-1234567 o V-1.234.567" maxlength="12" inputmode="text" style="width:100%"></div>
+      <div style="flex:1;min-width:180px"><label>Correo</label><input name="email" type="email" value="{{ form.get('email','') }}" style="width:100%"></div>
+      <div style="flex:1;min-width:180px"><label for="condicion">Condición del docente</label>
+        <input id="condicion" name="condicion" list="lista_condiciones" value="{{ form.get('condicion','') }}" style="width:100%" placeholder="Ej. Contratado Nuevo, Ordinario…">
+        <datalist id="lista_condiciones">{% for c in condiciones_docente %}<option value="{{ c }}">{% endfor %}</datalist>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:2;min-width:240px"><label>Carrera *</label>
+        <input id="carrera-individual" name="carrera" list="lista_carreras" required value="{{ form.get('carrera','') }}" style="width:100%">
+        <datalist id="lista_carreras">{% for c in opciones.carreras %}<option value="{{ c }}">{% endfor %}</datalist></div>
+      <div style="flex:2;min-width:240px"><label>Materia *</label>
+        <input name="materia" list="lista_materias" required value="{{ form.get('materia','') }}" style="width:100%">
+        <datalist id="lista_materias">{% for m in opciones.materias %}<option value="{{ m }}">{% endfor %}</datalist></div>
+      <div style="flex:1;min-width:120px"><label>Código</label><input name="codigo" value="{{ form.get('codigo','') }}" style="width:100%"></div>
+    </div>
+    <div class="row">
+      <div style="flex:1"><label>Sección</label><input name="seccion" value="{{ form.get('seccion','') }}" style="width:100%"></div>
+      <div style="flex:1"><label>Semestre / Ciclo</label><input name="semestre" value="{{ form.get('semestre','') }}" style="width:100%"></div>
+      <div style="flex:1"><label>Unidades de crédito</label><input name="creditos" type="number" min="0" max="30" step="1" inputmode="numeric" value="{{ form.get('creditos','') }}" style="width:100%"></div>
+      <div style="flex:1"><label>Bloques semanales</label><input name="bloques" type="number" min="1" max="7" step="1" inputmode="numeric" value="{{ form.get('bloques','1') }}" style="width:100%"></div>
+      <div style="flex:1"><label>Ambiente preferido</label><input name="ambiente" list="lista_amb" value="{{ form.get('ambiente','') }}" style="width:100%">
+        <datalist id="lista_amb">{% for a in opciones.ambientes %}<option value="{{ a }}">{% endfor %}</datalist></div>
+    </div>
+    <div class="row">
+      <div style="flex:2"><label>Disponibilidad horaria *</label>
+        <div class="checks" role="group" aria-label="Días de disponibilidad">
+          {% for d in dias_form %}
+            <label class="chk"><input type="checkbox" name="dia" value="{{ d }}"> {{ d }}</label>
+          {% endfor %}
+        </div></div>
+      <div><label for="hora_inicio">Desde *</label><input id="hora_inicio" name="hora_inicio" type="time" value="{{ form.get('hora_inicio','07:40') }}" required></div>
+      <div><label for="hora_fin">Hasta *</label><input id="hora_fin" name="hora_fin" type="time" value="{{ form.get('hora_fin','09:20') }}" required></div>
+    </div>
+    <button class="btn btn-primary">Guardar y asignar automáticamente</button>
+  </form>
+</div>
+
+<div class="card" id="multiple">
+  <h3>Carga múltiple manual</h3>
+  <p class="sub">Agregue tantas materias como necesite (para uno o varios docentes). Se revisa que ningún docente o ambiente quede con dos clases simultáneas; si hay conflicto, no se guarda nada.</p>
+  <form method="post" action="/carga-multiple" id="form-multiple" onsubmit="document.getElementById('total_filas').value=document.querySelectorAll('.fila-carga').length">
+    <input type="hidden" name="total_filas" id="total_filas" value="0">
+    <div id="filas-multiple"></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="btn btn-light" id="agregar-fila">＋ Agregar materia</button>
+      <button type="submit" class="btn btn-success">Guardar carga múltiple</button>
+      <span class="sub" id="contador-filas" aria-live="polite" style="margin:0"></span>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Importación masiva</h3>
+  <p class="sub">Importe la oferta académica desde el Excel de 9 hojas o un archivo de texto.</p>
+  <form method="post" action="/importar" enctype="multipart/form-data">
+    <input type="file" name="archivo" accept=".xlsx,.txt,.csv" required aria-label="Archivo de oferta académica">
+    <button class="btn btn-success">Importar archivo</button>
+  </form>
+</div>
+
+<template id="plantilla-fila">
+  <div class="fila-carga">
+    <div class="fila-head"><b class="titulo-fila">Materia</b><button type="button" class="btn-icon" aria-label="Quitar esta materia">✕</button></div>
+    <div class="fila-grid">
+      <label class="campo ancho">Docente *<input name="" data-campo="profesor" list="lista_prof" required placeholder="Nombre y apellidos"></label>
+      <label class="campo">Cédula<input name="" data-campo="cedula" pattern="{{ patron_cedula }}" title="Ej.: V-1234567 o V-1.234.567" maxlength="12" inputmode="text"></label>
+      <label class="campo">Correo<input name="" data-campo="email" type="email"></label>
+      <label class="campo">Condición<input name="" data-campo="condicion" list="lista_condiciones" placeholder="Ej. Ordinario"></label>
+      <label class="campo ancho">Carrera *<input name="" data-campo="carrera" list="lista_carreras" required></label>
+      <label class="campo ancho">Materia *<input name="" data-campo="materia" list="lista_materias" required></label>
+      <label class="campo">Código<input name="" data-campo="codigo"></label>
+      <label class="campo">Sección<input name="" data-campo="seccion" value="Sección A"></label>
+      <label class="campo">Semestre / Ciclo<input name="" data-campo="semestre" value="1er Semestre"></label>
+      <label class="campo">Créditos<input name="" data-campo="creditos" type="number" min="0" max="30" step="1" inputmode="numeric" value="0"></label>
+      <label class="campo">Bloques<input name="" data-campo="bloques" type="number" min="1" max="7" step="1" inputmode="numeric" value="1"></label>
+      <label class="campo">Ambiente preferido<input name="" data-campo="ambiente" list="lista_amb"></label>
+      <div class="campo ancho"><span class="etiqueta">Días *</span><div class="checks" data-dias></div></div>
+      <label class="campo">Desde *<input name="" data-campo="hora_inicio" type="time" value="07:40" required></label>
+      <label class="campo">Hasta *<input name="" data-campo="hora_fin" type="time" value="09:20" required></label>
+      <label class="chk campo"><input name="" data-campo="compartidos" type="checkbox"> Clase compartida</label>
+    </div>
+  </div>
+</template>
+
+<script>
+(function () {
+  const DIAS = {{ dias_form|tojson }};
+  const MATERIAS_POR_CARRERA = {{ opciones.materias_por_carrera|tojson }};
+  const TODAS = Object.values(MATERIAS_POR_CARRERA).flat();
+  const contenedor = document.getElementById('filas-multiple');
+  const plantilla = document.getElementById('plantilla-fila');
+  const contador = document.getElementById('contador-filas');
+  let indice = 0;
+
+  const esc = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const norm = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+
+  // El datalist de materias depende de la carrera elegida en esa misma fila.
+  function materiasDe(carrera) {
+    const clave = Object.keys(MATERIAS_POR_CARRERA)
+      .find((k) => norm(k) === norm(carrera));
+    return clave ? MATERIAS_POR_CARRERA[clave] : TODAS;
+  }
+
+  function sincronizarMaterias(carreraInput, materiaInput, datalist, limpiar) {
+    const opciones = materiasDe(carreraInput.value);
+    datalist.innerHTML = opciones.map((m) => '<option value="' + esc(m) + '">').join('');
+    // Al CAMBIAR de carrera, una materia de la carrera anterior deja de ser válida.
+    if (limpiar && norm(carreraInput.value) && materiaInput.value &&
+        !opciones.some((m) => norm(m) === norm(materiaInput.value))) {
+      materiaInput.value = '';
+    }
+  }
+
+  function enlazarMaterias(carreraInput, materiaInput, datalist) {
+    const alCambiar = () => sincronizarMaterias(carreraInput, materiaInput, datalist, true);
+    carreraInput.addEventListener('input', alCambiar);
+    carreraInput.addEventListener('change', alCambiar);
+    // Al pintar por primera vez se respeta lo que ya venía en el formulario.
+    sincronizarMaterias(carreraInput, materiaInput, datalist, false);
+  }
+
+  function actualizar() {
+    const n = contenedor.querySelectorAll('.fila-carga').length;
+    document.getElementById('total_filas').value = n;
+    contador.textContent = n ? n + ' materia(s) en esta carga' : 'Sin materias agregadas';
+    contenedor.querySelectorAll('.titulo-fila').forEach((el, i) => { el.textContent = 'Materia ' + (i + 1); });
+  }
+
+  function agregarFila(datos) {
+    datos = datos || {};
+    const n = indice++;
+    const nodo = plantilla.content.firstElementChild.cloneNode(true);
+    nodo.querySelectorAll('[data-campo]').forEach((input) => {
+      const clave = input.dataset.campo;
+      input.name = clave + '_' + n;
+      if (clave === 'compartidos') {
+        input.checked = !!datos[clave];
+      } else {
+        const valor = datos[clave];
+        input.value = valor === undefined || valor === null || valor === '' ? (input.value || '') : valor;
+      }
+    });
+    const carreraInput = nodo.querySelector('[data-campo="carrera"]');
+    const materiaInput = nodo.querySelector('[data-campo="materia"]');
+    const listaMaterias = document.createElement('datalist');
+    listaMaterias.id = 'lista_materias_' + n;
+    materiaInput.setAttribute('list', listaMaterias.id);
+    nodo.appendChild(listaMaterias);
+
+    const cajaDias = nodo.querySelector('[data-dias]');
+    cajaDias.innerHTML = DIAS.map((d) => {
+      const marcado = (datos.dias || []).some((x) => x === d) ? ' checked' : '';
+      const did = 'dia_' + d.replace(/\s/g, '') + '_' + n;
+      return '<label class="chk"><input type="checkbox" name="dia_' + n + '" value="' + esc(d) +
+             '" id="' + did + '"' + marcado + '> ' + esc(d) + '</label>';
+    }).join('');
+    nodo.querySelector('.btn-icon').addEventListener('click', () => { nodo.remove(); actualizar(); });
+    contenedor.appendChild(nodo);
+    enlazarMaterias(carreraInput, materiaInput, listaMaterias);
+    actualizar();
+    return nodo;
+  }
+
+  document.getElementById('agregar-fila').addEventListener('click', () => agregarFila());
+  enlazarMaterias(
+    document.getElementById('carrera-individual'),
+    document.querySelector('input[name="materia"]'),
+    document.getElementById('lista_materias')
+  );
+  const restaurar = {{ filas_multi|tojson }};
+  (restaurar.length ? restaurar : [{}]).forEach(agregarFila);
+})();
+</script>
+{% endblock %}

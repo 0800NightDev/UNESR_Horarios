@@ -1,0 +1,15 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+*.db-shm
+*.db-wal
+reportes_imprimibles/
+# Solo se ignoran los archivos que suba el usuario en tiempo de ejecución.
+# Se conservan las plantillas y el Excel de oferta de ejemplo.
+uploads/*.db
+uploads/*.db-*
