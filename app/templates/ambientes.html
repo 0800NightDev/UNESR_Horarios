@@ -1,10 +1,11 @@
 {% extends "base.html" %}{% block content %}
 <h2>Ambientes</h2>
 <p class="sub">Inventario de salones, laboratorios y ambientes especiales con su capacidad.</p>
-<p class="sub">Orden oficial (continuo, sin saltos entre pisos):
-  <b>Piso 1 → Piso 2 → Piso 3 → Piso 4 → Satelitales → Planta Baja (PB) →
-  Virtuales → Laboratorios y Otros</b>. Dentro de cada piso se enumeran por
-  número natural: <code>P1-02</code> antes que <code>P1-10</code>.</p>
+<p class="sub"><b>41 ambientes oficiales</b>, en orden continuo:
+  <b>Piso 1 (P1-01…P1-08) → Piso 2 (P2-09…P2-22) → Piso 3 (P3-23…P3-27) →
+  Piso 4 (P4-28…P4-37) → Satelitales (01–02) → Virtuales (01–02)</b>.
+  La numeración de los pisos es global y consecutiva; las capacidades se
+  conservan tal como están.</p>
 <div class="card">
   <h3>Nuevo ambiente</h3>
   <form method="post" class="row ambientes-form">

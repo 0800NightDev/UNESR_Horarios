@@ -261,7 +261,7 @@ def horarios():
                            carrera=carrera, dia=dia, profesor_id=profesor_id,
                            filas=filas, por_dia=por_dia, cuadro=cuadro, estado=estado,
                            profesores=queries.profesores(),
-                           ambientes=db.ordenar_ambientes(
+                           ambientes=db.ambientes_oficiales(
                                db.query("SELECT id,codigo FROM salones")),
                            conflictos_por_id=conflictos_por_id,
                            conflictos_carrera=conflictos_carrera,
@@ -347,9 +347,9 @@ def ambientes():
                          FROM salones s""")
     # Piso 1 → Piso 4 → Satelitales → Planta Baja → Virtuales → Otros,
     # con numeración natural (P1-02 antes que P1-10) dentro de cada piso.
-    grupos = db.agrupar_ambientes(filas)
-    return render_template("ambientes.html", salones=filas, grupos=grupos,
-                           sectores=db.SECTORES_AMBIENTE)
+    grupos = db.agrupar_ambientes(db.ambientes_oficiales(filas))
+    return render_template("ambientes.html", salones=db.ambientes_oficiales(filas),
+                           grupos=grupos, sectores=db.SECTORES_AMBIENTE)
 
 
 # ── Docentes ───────────────────────────────────────────────────────────

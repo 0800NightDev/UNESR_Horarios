@@ -22,8 +22,9 @@ Linux, con **Supabase** como backend opcional y SQLite como respaldo local.
 
 **Resultado verificado:** el generador asigna ambientes sin crear choques y
 reporta explícitamente los bloques que no puede ubicar. La base semilla conserva
-**440 asignaciones históricas con horas fijas y 17 colisiones** (14 de ambiente
-y 3 de docente + ambiente): el Dashboard las muestra con su motivo y la carrera
+**440 asignaciones históricas con horas fijas y 6 colisiones** (3 de ambiente,
+1 de docente y 2 de docente + ambiente, las cuales bajaron de 17 al normalizar
+el inventario de ambientes): el Dashboard las muestra con su motivo y la carrera
 afectada permite reasignarlas a mano. Esas reasignaciones quedan marcadas como
 `Manual` y se conservan si luego se regenera el horario.
 
@@ -106,6 +107,7 @@ UNESR_TEST_BRANCH/
 ├── sql/schema.sql       # Esquema PostgreSQL/Supabase
 ├── scripts/
 │   ├── migrate_to_supabase.py
+│   ├── normalizar_ambientes.py  # deja solo los 41 salones oficiales
 │   └── build_exe.py
 ├── data/                # BD semilla, plan de estudio y oferta
 ├── assets/UNESR.png
@@ -171,7 +173,9 @@ Si no hay credenciales de Supabase, el sistema usa automáticamente
 ### 4.1 Modo local (por defecto)
 
 No hay que hacer nada: la BD semilla ya incluye **12 carreras** con sus
-**788 unidades curriculares**, 111 docentes, 73 ambientes y 440 asignaciones
+**788 unidades curriculares**, 111 docentes, 41 ambientes oficiales y 440 asignaciones
+(clases que estaban en ambientes externos se reubicaron a salones oficiales
+respetando sus capacidades y evitando solapes; ver sección 8)
 históricas. Los 3 PNF se importan de estos PDFs en `uploads/`:
 
 | PNF | PDF | Unidades |
@@ -397,10 +401,10 @@ Abre la aplicación y confirma que:
 
 1. El **Dashboard** muestra 12 carreras, 111 docentes, 789 materias y el
    desplegable **“Colisiones actuales”**.
-2. En **Ambientes**, el orden es
-   `Piso 1 → Piso 2 → Piso 3 → Piso 4 → Satelitales → Planta Baja (PB) →
-   Virtuales → Laboratorios y Otros`, con encabezados de sección y numeración
-   continua dentro de cada piso.
+2. En **Ambientes** aparecen exactamente **41 salones**:
+   `P1-01…P1-08 → P2-09…P2-22 → P3-23…P3-27 → P4-28…P4-37 →
+   SATELITAL-01/02 → VIRTUAL-01/02`, con encabezados de sección y numeración
+   global consecutiva.
 3. En **Horarios**, al elegir una carrera con colisiones, las clases aparecen
    **en rojo** y el panel permite reasignar.
 4. No aparecen errores `42703` en la terminal ni en la interfaz.
@@ -475,6 +479,15 @@ git add . && git commit -m "Rewrite del sistema UNESR" && git push
 
 ## 8. Notas
 
+- **Inventario de ambientes:** solo existen los 41 salones oficiales. La
+  importación original traía 32 ambientes extra (PB, coordinaciones, aulas
+  duplicadas, etc.) con 342 clases asignadas. Se reubicaron esas clases a
+  salones oficiales con `scripts/normalizar_ambientes.py`, priorizando el mismo
+  piso, sin crear solapes de ambiente y conservando las capacidades actuales;
+  luego se borraron los 32 ambientes extra. El script tiene modo simulación
+  (sin `--apply`) y guarda el plan de reasignación en `/tmp` para poder
+  revertirlo. Las 440 asignaciones se conservaron; las colisiones pasaron de
+  17 a 6 (todas preexistentes en salones oficiales).
 - El pensum de las 9 carreras de Administración/Educación se tomó de
   `data/PLAN DE ESTUDIO 2024(1).xlsx` (hojas `ARRHH_2024`, `ARMF 2024`, etc.);
   el de los 3 PNF se extrajo de los PDFs en `uploads/` con `pdftotext -layout`.

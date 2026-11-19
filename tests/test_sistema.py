@@ -187,7 +187,7 @@ class TestDatosYPlan(BaseTest):
         s = db.estadisticas()
         self.assertGreaterEqual(s["carreras"], 9)
         self.assertGreaterEqual(s["profesores"], 100)
-        self.assertGreaterEqual(s["salones"], 70)
+        self.assertEqual(s["salones"], 41)
 
     def test_plan_estudio_importado_completo(self):
         self.assertGreaterEqual(self._plan["total"], 650)

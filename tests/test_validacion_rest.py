@@ -160,6 +160,22 @@ class TestOrdenAmbientes(unittest.TestCase):
             with self.subTest(codigo=codigo):
                 self.assertEqual(db.categoria_ambiente(codigo)[0], sector)
 
+    def test_inventario_oficial_es_el_correcto(self):
+        esperado = ([f"P1-{n:02d}" for n in range(1, 9)]
+                    + [f"P2-{n:02d}" for n in range(9, 23)]
+                    + [f"P3-{n:02d}" for n in range(23, 28)]
+                    + [f"P4-{n:02d}" for n in range(28, 38)]
+                    + ["SATELITAL-01", "SATELITAL-02", "VIRTUAL-01", "VIRTUAL-02"])
+        self.assertEqual(list(db.AMBIENTES_OFICIALES), esperado)
+        self.assertEqual(len(db.AMBIENTES_OFICIALES), 41)
+
+        filas = [{"id": i, "codigo": c} for i, c in enumerate(
+            ["VIRTUAL-01", "P3-04", "PB-01", "P2-09", "P1-01", "CURSO VIRTUAL"])]
+        self.assertEqual(
+            [f["codigo"] for f in db.ambientes_oficiales(filas)],
+            ["P1-01", "P2-09", "VIRTUAL-01"],
+        )
+
     def test_orden_natural_y_continuo_por_pisos(self):
         codigos = ["VIRTUAL-01", "P3-04", "P1-10", "SATELITAL-01", "PB-02",
                    "P2-09", "COORDINACIÓN PASANTIAS", "P1-02", "P4-28", "P3-23"]

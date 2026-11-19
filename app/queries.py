@@ -182,7 +182,7 @@ def profesores() -> List[Dict]:
 
 def salones() -> List[Dict]:
     """Ambientes en el orden oficial: pisos, satelitales, PB, virtuales y otros."""
-    return db.ordenar_ambientes(
+    return db.ambientes_oficiales(
         db.query("SELECT id,codigo,capacidad,edificio,es_camillas FROM salones"))
 
 

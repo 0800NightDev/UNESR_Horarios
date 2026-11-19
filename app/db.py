@@ -50,7 +50,17 @@ FRANJAS = [
     ("12:30", "13:50"), ("14:10", "15:30"), ("15:40", "17:00"), ("17:10", "18:30"),
 ]
 CAPACIDAD_DEFECTO = 45
-AMBIENTES_ESPECIALES = ["SATELITAL-01", "SATELITAL-02", "VIRTUAL-01", "VIRTUAL-02", "CURSO VIRTUAL"]
+# Inventario oficial: numeración global consecutiva por piso (37 salones) más
+# 2 satelitales y 2 virtuales. Solo estos 41 ambientes se muestran y se pueden
+# asignar; cualquier otro código que aparezca en una importación se ignora.
+AMBIENTES_OFICIALES: Tuple[str, ...] = tuple(
+    [f"P1-{n:02d}" for n in range(1, 9)]
+    + [f"P2-{n:02d}" for n in range(9, 23)]
+    + [f"P3-{n:02d}" for n in range(23, 28)]
+    + [f"P4-{n:02d}" for n in range(28, 38)]
+    + ["SATELITAL-01", "SATELITAL-02", "VIRTUAL-01", "VIRTUAL-02"]
+)
+AMBIENTES_ESPECIALES = ["SATELITAL-01", "SATELITAL-02", "VIRTUAL-01", "VIRTUAL-02"]
 
 _local = threading.local()
 
@@ -669,6 +679,15 @@ def ordenar_ambientes(filas: Iterable[Dict], campo: str = "codigo") -> List[Dict
         key=lambda f: (categoria_ambiente(f.get(campo))[1],
                        clave_orden_ambiente(f.get(campo)),
                        str(f.get("id") or "")),
+    )
+
+
+def ambientes_oficiales(filas: Iterable[Dict], campo: str = "codigo") -> List[Dict]:
+    """Filtra a los 41 salones oficiales y los deja en el orden correcto."""
+    permitidos = set(AMBIENTES_OFICIALES)
+    return ordenar_ambientes(
+        [f for f in filas if str(f.get(campo) or "").strip().upper() in permitidos],
+        campo,
     )
 
 
