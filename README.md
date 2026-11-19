@@ -242,7 +242,7 @@ Otras comprobaciones: `/horarios` (por carrera y día), `/carreras` (los 3 PNF
 con 44/57/55 materias), `/reporte?descargar=1`, y los filtros de carrera/día.
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v   # 18 pruebas, siempre locales
+.venv/bin/python -m unittest discover -s tests -v   # 41 pruebas, siempre locales
 ```
 
 > No se necesitan archivos `.dll` ni `psycopg`: la conexión es HTTPS via
@@ -265,52 +265,148 @@ CREATE POLICY "acceso_app" ON carreras FOR ALL USING (true) WITH CHECK (true);
 
 ---
 
-## 5. Generar el ejecutable
+## 5. Generar el ejecutable (guía para el equipo)
 
-### Windows (generar `.exe` — debe hacerse DENTRO de Windows)
+**Regla de oro:** el ejecutable se compila **en el mismo sistema donde se va a
+usar**. PyInstaller no puede crear un `.exe` de Windows desde Linux, ni un binario
+de Linux desde Windows. Si tienes Windows, sigue la sección A; si tienes Linux,
+la sección B.
 
-PyInstaller **no puede compilar un `.exe` de Windows desde Linux**: el ejecutable
-de Windows debe generarse en una máquina Windows (o una VM). En este repo se
-incluye el ejecutable de Linux; para el de Windows, en Windows ejecuta:
+| Tu sistema | Sección | Archivo que obtienes |
+|---|---|---|
+| Windows 10/11 de 64 bits | A | `dist\UNESR_Horarios\UNESR_Horarios.exe` |
+| Linux de 64 bits | B | `dist/UNESR_Horarios/UNESR_Horarios` |
 
-```powershell
-scripts\build_windows.bat
-```
+### Antes de empezar (haz esto en TU PC, una sola vez)
 
-O, paso a paso:
+1. **Descarga el código** (o pide la carpeta del proyecto):
+   ```powershell
+   git clone https://github.com/0800NightDev/UNESR_Horarios.git
+   cd UNESR_Horarios
+   ```
+   Si no tienes Git, entra a la URL, pulsa **Code → Download ZIP**, descomprime
+   y abre una terminal dentro de la carpeta resultante.
+
+2. **Instala Python 3.11 o 3.12 de 64 bits** desde <https://www.python.org/downloads/>.
+   - En Windows, durante la instalación marca ✅ **“Add python.exe to PATH”**.
+   - Comprueba que funciona:
+     ```powershell
+     python --version
+     ```
+     Debe decir `Python 3.11.x` o `Python 3.12.x`. Si dice `Python 3.10` o sale
+     “no se reconoce”, instala la versión correcta y vuelve a abrir la terminal.
+
+3. **Crea tu archivo de conexión a la base de datos.** Copia la plantilla y
+   rellena tus valores:
+   ```powershell
+   copy .env.example .env        # Windows
+   cp .env.example .env          # Linux
+   ```
+   - Si vas a usar **Supabase**, pega tu `SUPABASE_URL` y `SUPABASE_KEY` reales
+     en el `.env`. **Nunca subas ese `.env` a GitHub** (ya está en `.gitignore`).
+   - Si quieres probar **sin internet / sin Supabase**, deja
+     `DB_BACKEND=sqlite`: el sistema usa la base de datos semilla incluida y
+     funciona igual, con los mismos datos de ejemplo.
+
+4. **Ten conexión a internet la primera vez** (para descargar las librerías con
+   `pip`). Después el ejecutable funciona sin internet si usas `sqlite`.
+
+### A. Compilar en Windows (generar el `.exe`)
+
+Abre **PowerShell** dentro de la carpeta del proyecto y ejecuta, en orden:
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller
-.venv\Scripts\python.exe scripts\build_exe.py
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller
+.\scripts\build_windows.bat
 ```
 
-Salida (modo `--onedir`, recomendado): `dist\UNESR_Horarios\UNESR_Horarios.exe`.
+El `.bat` hace exactamente lo mismo que estos comandos manuales (úsalos si el
+`.bat` falla):
 
-Para un único archivo: `.venv\Scripts\python.exe scripts\build_exe.py --onefile`.
+```powershell
+.\.venv\Scripts\python.exe -m pip install pyinstaller
+.\.venv\Scripts\python.exe scripts\build_exe.py
+```
 
-**Pasos adicionales en Windows:**
-1. Instalar Python 3.11/3.12 de **64 bits** (el de 32 bits no soporta pywebview bien).
-2. Instalar [poppler-for-windows](https://github.com/oschwartz10612/poppler-windows)
-   y agregar su carpeta `bin` al PATH para que `pdftotext.exe` pueda recargar
-   los PNF desde los PDF. El script avisa si no lo encuentra.
-3. Copiar `.env` junto al `.exe`, o crearlo en `%APPDATA%\UNESR_Horarios\.env`.
-4. Si Windows Defender bloquea el binario, agregar la carpeta `dist` a exclusiones.
+**Resultado:** `dist\UNESR_Horarios\UNESR_Horarios.exe` junto a una carpeta
+`_internal`. **Copia toda la carpeta `dist\UNESR_Horarios`**, no solo el `.exe`.
 
-Los datos se guardan en `%APPDATA%\UNESR_Horarios\data\universidad_horarios.db`.
+Para probarlo:
 
-### Linux (ya incluido en este repo)
+```powershell
+cd dist\UNESR_Horarios
+copy ..\..\.env .env        # si usas Supabase; si no, omitelo
+.\UNESR_Horarios.exe        # ventana nativa
+.\UNESR_Horarios.exe --server   # o modo navegador en http://127.0.0.1:5000
+```
+
+Notas importantes de Windows:
+
+- Si prefieres **un solo archivo**:
+  `.\.venv\Scripts\python.exe scripts\build_exe.py --onefile` (tarda más en abrir).
+- Para importar los PNF desde PDF hace falta `pdftotext.exe`: instala
+  [poppler-for-windows](https://github.com/oschwartz10612/poppler-windows),
+  descomprímelo y agrega su carpeta `bin` al **PATH**. Sin él, el resto del
+  sistema funciona; solo falla la carga de PNF desde PDF.
+- Si Windows Defender bloquea el binario: **Seguridad de Windows → Protección
+  contra virus → Exclusiones → Agregar carpeta** y elige `dist`.
+- Si al abrir sale una pantalla negra, usa `--server` y abre el navegador; es
+  una limitación del WebView en algunas máquinas, no un error de datos.
+- Los datos se guardan en `%APPDATA%\UNESR_Horarios\data\universidad_horarios.db`.
+
+### B. Compilar en Linux
+
+Abre una terminal dentro de la carpeta del proyecto:
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt pyinstaller
 .venv/bin/python scripts/build_exe.py
-./dist/UNESR_Horarios/UNESR_Horarios --server   # modo servidor
-./dist/UNESR_Horarios/UNESR_Horarios            # modo ventana nativa
 ```
 
+Si el comando `python3 -m venv` dice *“ensurepip is not available”*, instala el
+paquete de Python de tu distro, por ejemplo:
+`sudo apt install python3-venv python3-pip` (Debian/Ubuntu) o
+`sudo dnf install python3-pip` (Fedora).
+
+**Resultado:** `dist/UNESR_Horarios/UNESR_Horarios`. Para probarlo:
+
+```bash
+cp .env dist/UNESR_Horarios/.env     # solo si usas Supabase
+./dist/UNESR_Horarios/UNESR_Horarios         # ventana nativa (requiere WebKit/GTK)
+./dist/UNESR_Horarios/UNESR_Horarios --server   # o navega a http://127.0.0.1:5000
+```
+
+Si la ventana nativa no abre en Linux, instala `python3-gi gir1.2-webkit2-4.0`
+(o `libwebkit2gtk-4.1-0`) y usa `--server` mientras tanto.
 Los datos se guardan en `~/.local/share/UNESR_Horarios/data/`.
 
-El script incluye en el bundle: plantillas, logo, BD semilla, plan de estudio,
-uploads y `pdftotext`. pywebview usa Edge Chromium en Windows y WebKit/GTK en Linux.
+### Comprobación rápida después de compilar
+
+Abre la aplicación y confirma que:
+
+1. El **Dashboard** muestra 12 carreras, 111 docentes, 789 materias y el
+   desplegable **“Colisiones actuales”**.
+2. En **Ambientes**, el orden es
+   `Piso 1 → Piso 2 → Piso 3 → Piso 4 → Satelitales → Planta Baja (PB) →
+   Virtuales → Laboratorios y Otros`, con encabezados de sección y numeración
+   continua dentro de cada piso.
+3. En **Horarios**, al elegir una carrera con colisiones, las clases aparecen
+   **en rojo** y el panel permite reasignar.
+4. No aparecen errores `42703` en la terminal ni en la interfaz.
+
+Si algo falla, ejecuta antes las pruebas para localizar el problema:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v       # Linux
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v   # Windows
+```
+
+El bundle incluye plantillas, logo, base semilla, plan de estudio, `uploads` y
+`pdftotext`. pywebview usa Edge Chromium en Windows y WebKit/GTK en Linux.
 
 ---
 
@@ -332,15 +428,16 @@ colisiones con motivos y sugerencia de reasignación.
 
 Repositorio: `https://github.com/0800NightDev/UNESR_Horarios`.
 
-Estado: Verificación completa y **commit local creado**
-(`42bc7f2`). El `git push` quedó pendiente porque esta máquina no tiene
-credenciales de GitHub configuradas (`gh`, credential helper o token). Si ya
-configuraste credenciales, basta con:
+Estado: **código verificado y publicado** en la rama `main` (41 pruebas en verde,
+sin errores `42703`). Para bajar la última versión en otro equipo:
 
 ```bash
-cd ~/Documentos/UNESR_TEST_BRANCH
-git push -u origin main
+git clone https://github.com/0800NightDev/UNESR_Horarios.git
+cd UNESR_Horarios
 ```
+
+Si ya tenías el repo clonado: `git pull origin main`. Después sigue la sección 5
+para compilar el ejecutable de tu sistema.
 
 Para configurar el repo desde cero en otro equipo:
 

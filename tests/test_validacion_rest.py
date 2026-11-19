@@ -144,5 +144,36 @@ class TestDetalleConflictos(unittest.TestCase):
         self.assertIn("Materia B", cols[0]["detalle"])
 
 
+class TestOrdenAmbientes(unittest.TestCase):
+    def test_categorias_oficiales(self):
+        casos = {
+            "P1-01": "Piso 1", "P2-09": "Piso 2", "P3-23": "Piso 3",
+            "P4-28": "Piso 4", "AULA 305": "Piso 3", "MAGNA": "Piso 3",
+            "SATELITAL-01": "Satelitales", "PB-00": "Planta Baja (PB)",
+            "PLANTA BAJA 2": "Planta Baja (PB)", "VIRTUAL-01": "Virtuales",
+            "CURSO VIRTUAL": "Virtuales", "ONLINE-02": "Virtuales",
+            "CANCHA": "Laboratorios y Otros",
+            "COORDINACIÒN MATEMÁTICA": "Laboratorios y Otros",
+            "´P4-10": "Piso 4",
+        }
+        for codigo, sector in casos.items():
+            with self.subTest(codigo=codigo):
+                self.assertEqual(db.categoria_ambiente(codigo)[0], sector)
+
+    def test_orden_natural_y_continuo_por_pisos(self):
+        codigos = ["VIRTUAL-01", "P3-04", "P1-10", "SATELITAL-01", "PB-02",
+                   "P2-09", "COORDINACIÓN PASANTIAS", "P1-02", "P4-28", "P3-23"]
+        filas = [{"id": i, "codigo": c} for i, c in enumerate(codigos)]
+        ordenados = db.ordenar_ambientes(filas)
+        self.assertEqual([f["codigo"] for f in ordenados], [
+            "P1-02", "P1-10", "P2-09", "P3-04", "P3-23", "P4-28",
+            "SATELITAL-01", "PB-02", "VIRTUAL-01", "COORDINACIÓN PASANTIAS",
+        ])
+        self.assertEqual([g["sector"] for g in db.agrupar_ambientes(filas)], [
+            "Piso 1", "Piso 2", "Piso 3", "Piso 4",
+            "Satelitales", "Planta Baja (PB)", "Virtuales", "Laboratorios y Otros",
+        ])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -610,6 +610,81 @@ def normalizar_cedula(valor: Any) -> str:
     return f"{texto[0]}-{digitos}"
 
 
+# Orden oficial de ambientes, tomado del inventario del sistema original
+# (database.py / SGHU_Universidad.py de servicio-comunitario-horarios).
+SECTORES_AMBIENTE: Tuple[Tuple[str, int], ...] = (
+    ("Piso 1", 1),
+    ("Piso 2", 2),
+    ("Piso 3", 3),
+    ("Piso 4", 4),
+    ("Satelitales", 5),
+    ("Planta Baja (PB)", 6),
+    ("Virtuales", 7),
+    ("Laboratorios y Otros", 8),
+)
+
+
+def categoria_ambiente(codigo: Any) -> Tuple[str, int]:
+    """Devuelve ``(sector, prioridad)`` para un código de ambiente.
+
+    Reproduce ``categorizar_piso_ambiente()`` del sistema original: P1, P2, P3,
+    P4, SATELITAL, PB, VIRTUAL y, por último, laboratorios/dependencias varias.
+    """
+    c = str(codigo or "").strip().strip("´'`\"").upper()
+    for prefijo in ("P1.", "P2.", "P3.", "P4."):
+        if c.startswith(prefijo):
+            c = prefijo[:2] + "-" + c[3:]
+    if (c.startswith("P1-") or c.startswith("P1") or "PISO 1" in c
+            or c.startswith("AULA 1")):
+        return "Piso 1", 1
+    if (c.startswith("P2-") or c.startswith("P2") or "PISO 2" in c
+            or c.startswith("AULA 2")):
+        return "Piso 2", 2
+    if (c.startswith("P3-") or c.startswith("P3") or "PISO 3" in c
+            or c.startswith("AULA 3") or "MAGNA" in c):
+        return "Piso 3", 3
+    if (c.startswith("P4-") or c.startswith("P4") or "PISO 4" in c
+            or c.startswith("AULA 4")):
+        return "Piso 4", 4
+    if "SATELITAL" in c:
+        return "Satelitales", 5
+    if c.startswith("PB") or "PLANTA BAJA" in c:
+        return "Planta Baja (PB)", 6
+    if "VIRTUAL" in c or "ONLINE" in c:
+        return "Virtuales", 7
+    return "Laboratorios y Otros", 8
+
+
+def clave_orden_ambiente(codigo: Any) -> List[Tuple[int, Any]]:
+    """Orden natural: ``P1-2`` antes que ``P1-10`` (no orden alfabético)."""
+    c = str(codigo or "").strip().strip("´'`\"").upper()
+    return [(0, int(t)) if t.isdigit() else (1, normalizar(t))
+            for t in re.split(r"(\d+)", c) if t != ""]
+
+
+def ordenar_ambientes(filas: Iterable[Dict], campo: str = "codigo") -> List[Dict]:
+    """Ordena ambientes por sector y, dentro de cada sector, por número."""
+    return sorted(
+        filas,
+        key=lambda f: (categoria_ambiente(f.get(campo))[1],
+                       clave_orden_ambiente(f.get(campo)),
+                       str(f.get("id") or "")),
+    )
+
+
+def agrupar_ambientes(filas: Iterable[Dict], campo: str = "codigo") -> List[Dict]:
+    """Agrupa los ambientes ya ordenados para mostrar secciones seguidas por piso."""
+    por_sector: Dict[str, List[Dict]] = {}
+    for fila in ordenar_ambientes(filas, campo):
+        sector, _ = categoria_ambiente(fila.get(campo))
+        por_sector.setdefault(sector, []).append(fila)
+    return [
+        {"sector": sector, "total": len(por_sector[sector]), "filas": por_sector[sector]}
+        for sector, _prioridad in SECTORES_AMBIENTE
+        if sector in por_sector
+    ]
+
+
 def get_or_create(table: str, field: str, value: str, extra: Optional[Dict] = None) -> int:
     extra = extra or {}
     rows = query(f"SELECT id FROM {table} WHERE {field} = ? LIMIT 1", (value,))

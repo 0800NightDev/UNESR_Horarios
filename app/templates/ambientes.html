@@ -1,6 +1,10 @@
 {% extends "base.html" %}{% block content %}
 <h2>Ambientes</h2>
 <p class="sub">Inventario de salones, laboratorios y ambientes especiales con su capacidad.</p>
+<p class="sub">Orden oficial (continuo, sin saltos entre pisos):
+  <b>Piso 1 → Piso 2 → Piso 3 → Piso 4 → Satelitales → Planta Baja (PB) →
+  Virtuales → Laboratorios y Otros</b>. Dentro de cada piso se enumeran por
+  número natural: <code>P1-02</code> antes que <code>P1-10</code>.</p>
 <div class="card">
   <h3>Nuevo ambiente</h3>
   <form method="post" class="row ambientes-form">
@@ -19,28 +23,35 @@
   <table class="tabla-ambientes">
     <colgroup><col style="width:22%"><col style="width:12%"><col style="width:18%"><col style="width:14%"><col style="width:10%"><col style="width:24%"></colgroup>
     <thead><tr><th>Código</th><th>Capacidad</th><th>Edificio</th><th>Tipo</th><th>Clases</th><th>Acciones</th></tr></thead>
-    <tbody>{% for s in salones %}<tr>
-      <td><b>{{ s.codigo }}</b></td>
-      <td>{{ s.capacidad }}</td>
-      <td>{{ s.edificio or '—' }}</td>
-      <td><span class="badge {% if s.es_camillas %}warn{% endif %}">{{ 'Camillas' if s.es_camillas else 'Salón' }}</span></td>
-      <td>{{ s.usos }}</td>
-      <td class="acciones">
-        <form method="post">
-          <input type="hidden" name="id" value="{{ s.id }}">
-          <input type="hidden" name="accion" value="editar">
-          <input type="hidden" name="edificio" value="{{ s.edificio or '' }}">
-          {% if s.es_camillas %}<input type="hidden" name="es_camillas" value="1">{% endif %}
-          <input name="capacidad" type="number" value="{{ s.capacidad }}" min="0" max="1000" step="1" inputmode="numeric" aria-label="Capacidad de {{ s.codigo }}">
-          <button class="btn btn-light" title="Guardar capacidad" aria-label="Guardar capacidad de {{ s.codigo }}">↻</button>
-        </form>
-        <form method="post" onsubmit="return confirm('¿Eliminar este ambiente?')">
-          <input type="hidden" name="id" value="{{ s.id }}">
-          <input type="hidden" name="accion" value="eliminar">
-          <button class="btn btn-danger" title="Eliminar ambiente" aria-label="Eliminar {{ s.codigo }}">✕</button>
-        </form>
-      </td>
-    </tr>{% else %}<tr><td colspan="6" class="empty">No hay ambientes registrados.</td></tr>{% endfor %}</tbody>
+    {% for g in grupos %}
+    <tbody>
+      <tr class="fila-sector"><td colspan="6">{{ g.sector }} · {{ g.total }} ambiente{% if g.total != 1 %}s{% endif %}</td></tr>
+      {% for s in g.filas %}<tr>
+        <td><b>{{ s.codigo }}</b></td>
+        <td>{{ s.capacidad }}</td>
+        <td>{{ s.edificio or '—' }}</td>
+        <td><span class="badge {% if s.es_camillas %}warn{% endif %}">{{ 'Camillas' if s.es_camillas else 'Salón' }}</span></td>
+        <td>{{ s.usos }}</td>
+        <td class="acciones">
+          <form method="post">
+            <input type="hidden" name="id" value="{{ s.id }}">
+            <input type="hidden" name="accion" value="editar">
+            <input type="hidden" name="edificio" value="{{ s.edificio or '' }}">
+            {% if s.es_camillas %}<input type="hidden" name="es_camillas" value="1">{% endif %}
+            <input name="capacidad" type="number" value="{{ s.capacidad }}" min="0" max="1000" step="1" inputmode="numeric" aria-label="Capacidad de {{ s.codigo }}">
+            <button class="btn btn-light" title="Guardar capacidad" aria-label="Guardar capacidad de {{ s.codigo }}">↻</button>
+          </form>
+          <form method="post" onsubmit="return confirm('¿Eliminar este ambiente?')">
+            <input type="hidden" name="id" value="{{ s.id }}">
+            <input type="hidden" name="accion" value="eliminar">
+            <button class="btn btn-danger" title="Eliminar ambiente" aria-label="Eliminar {{ s.codigo }}">✕</button>
+          </form>
+        </td>
+      </tr>{% endfor %}
+    </tbody>
+    {% else %}
+    <tbody><tr><td colspan="6" class="empty">No hay ambientes registrados.</td></tr></tbody>
+    {% endfor %}
   </table>
 </div>
 {% endblock %}

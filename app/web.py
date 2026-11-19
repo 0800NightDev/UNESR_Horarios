@@ -261,7 +261,8 @@ def horarios():
                            carrera=carrera, dia=dia, profesor_id=profesor_id,
                            filas=filas, por_dia=por_dia, cuadro=cuadro, estado=estado,
                            profesores=queries.profesores(),
-                           ambientes=db.query("SELECT id,codigo FROM salones ORDER BY codigo"),
+                           ambientes=db.ordenar_ambientes(
+                               db.query("SELECT id,codigo FROM salones")),
                            conflictos_por_id=conflictos_por_id,
                            conflictos_carrera=conflictos_carrera,
                            dias=db.DIAS_ORDEN)
@@ -343,8 +344,12 @@ def ambientes():
             except Exception as exc:
                 flash(f"Error: {exc}", "danger")
     filas = db.query("""SELECT s.*, (SELECT COUNT(*) FROM asignaciones_horario a WHERE a.salon_id=s.id) AS usos
-                         FROM salones s ORDER BY s.codigo""")
-    return render_template("ambientes.html", salones=filas)
+                         FROM salones s""")
+    # Piso 1 → Piso 4 → Satelitales → Planta Baja → Virtuales → Otros,
+    # con numeración natural (P1-02 antes que P1-10) dentro de cada piso.
+    grupos = db.agrupar_ambientes(filas)
+    return render_template("ambientes.html", salones=filas, grupos=grupos,
+                           sectores=db.SECTORES_AMBIENTE)
 
 
 # ── Docentes ───────────────────────────────────────────────────────────
