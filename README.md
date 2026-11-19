@@ -20,8 +20,12 @@ Linux, con **Supabase** como backend opcional y SQLite como respaldo local.
 | Empaquetado | Flet usa APIs privadas y un cliente nativo externo; `.exe` fallaba | Sin Flet ni DLLs nativas; pywebview + httpx (PostgREST) → PyInstaller confiable |
 | Base de datos | SQLite local / PostgreSQL con DLLs | Supabase vía HTTPS (sin `psycopg`/DLLs) con fallback automático a SQLite |
 
-**Resultado verificado:** 432 clases asignadas, 8 pendientes (choques reales de
-docente presentes en los datos originales) y **0 conflictos** (antes había 17).
+**Resultado verificado:** el generador asigna ambientes sin crear choques y
+reporta explícitamente los bloques que no puede ubicar. La base semilla conserva
+**440 asignaciones históricas con horas fijas y 17 colisiones** (14 de ambiente
+y 3 de docente + ambiente): el Dashboard las muestra con su motivo y la carrera
+afectada permite reasignarlas a mano. Esas reasignaciones quedan marcadas como
+`Manual` y se conservan si luego se regenera el horario.
 
 ### Mejoras de frontend
 
@@ -105,7 +109,7 @@ UNESR_TEST_BRANCH/
 │   └── build_exe.py
 ├── data/                # BD semilla, plan de estudio y oferta
 ├── assets/UNESR.png
-├── tests/               # 39 pruebas automatizadas
+├── tests/               # 41 pruebas automatizadas
 ├── main.py              # Entry point (Flask + pywebview)
 ├── .env.example
 └── requirements.txt
@@ -118,7 +122,7 @@ UNESR_TEST_BRANCH/
 ### Windows (PowerShell)
 
 ```powershell
-cd ~/Documentos/UNESR_TEST_BRANCH
+cd UNESR_Horarios
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
@@ -131,13 +135,16 @@ automáticamente).
 ### Linux / macOS
 
 ```bash
-cd ~/Documentos/UNESR_TEST_BRANCH
+cd UNESR_Horarios
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 chmod +x iniciar_sistema.sh
 ./iniciar_sistema.sh
 ```
+
+> `cd UNESR_Horarios` asume que clonaste el repo (o descomprimiste el ZIP) con
+> ese nombre. Si tu carpeta se llama distinto, cambia ese `cd` por tu ruta real.
 
 ### Modos alternativos
 
@@ -442,7 +449,7 @@ para compilar el ejecutable de tu sistema.
 Para configurar el repo desde cero en otro equipo:
 
 ```bash
-cd ~/Documentos/UNESR_TEST_BRANCH
+cd UNESR_Horarios
 
 git init
 git remote add origin https://github.com/0800NightDev/UNESR_Horarios.git
@@ -473,9 +480,12 @@ git add . && git commit -m "Rewrite del sistema UNESR" && git push
   el de los 3 PNF se extrajo de los PDFs en `uploads/` con `pdftotext -layout`.
   En el récord de Agroecología se descartan las filas "(Secundaria)" y los
   sufijos `-1`/`-2` para no duplicar unidades curriculares.
-- Las 8 clases pendientes corresponden a docentes con dos materias asignadas
-  originalmente en el mismo día y hora; el generador las rechaza en lugar de
-  crear un conflicto. Se pueden resolver reasignando manualmente ese bloque.
+- Las colisiones que se ven al abrir el sistema vienen de la importación
+  original con horas fijas: hay docentes con dos materias en el mismo día y
+  hora, y ambientes repetidos. El generador **no las sobrescribe en silencio**:
+  las deja visibles con su motivo y ofrece reasignación manual por clase en
+  `/horarios`. Tras regenerar, pueden quedar bloques pendientes si no hay
+  ambiente libre; el motivo se muestra en los avisos.
 - No hay autenticación: el sistema está pensado para uso local/intranet.
 - Si al reimportar el plan aparecía `409 duplicate key ... (Ética, Valores y
   Autobiografía, ...)`, estaba corregido: `_rest_val()` ya no envuelve entre
