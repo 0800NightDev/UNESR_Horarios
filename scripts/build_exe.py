@@ -13,6 +13,7 @@ Requiere: pip install -r requirements.txt
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,15 @@ def build(onefile: bool = False) -> None:
         "--hidden-import", "openpyxl",
         "--collect-data", "webview",
     ]
+    # Solo se empaquetan los backends de ventana realmente instalados. Así el
+    # mismo exe funciona en escritorios con GTK o con Qt (CachyOS/Cosmic, KDE…).
+    for modulo in ("webview.platforms.gtk", "webview.platforms.qt",
+                   "webview.platforms.winforms", "qtpy", "PySide6", "PyQt6", "gi"):
+        try:
+            if importlib.util.find_spec(modulo):
+                comando += ["--hidden-import", modulo]
+        except (ImportError, ValueError):
+            pass
     if onefile:
         comando.append("--onefile")
     else:

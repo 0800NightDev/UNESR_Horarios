@@ -417,7 +417,61 @@ Si algo falla, ejecuta antes las pruebas para localizar el problema:
 ```
 
 El bundle incluye plantillas, logo, base semilla, plan de estudio, `uploads` y
-`pdftotext`. pywebview usa Edge Chromium en Windows y WebKit/GTK en Linux.
+`pdftotext`. pywebview usa WinForms/WebView2 en Windows, y GTK o Qt en Linux
+(se instalan automáticamente con `requirements.txt`).
+
+### Si la ventana no abre y solo sale el navegador (Linux, p. ej. CachyOS + Cosmic)
+
+Síntoma: en la terminal aparece algo como:
+
+```
+[pywebview] GTK cannot be loaded → ModuleNotFoundError: No module named 'gi'
+[pywebview] QT cannot be loaded  → ModuleNotFoundError: No module named 'qtpy'
+No se pudo abrir la ventana nativa (...). Abriendo en el navegador…
+```
+
+**Causa:** `iniciar_sistema.sh` antes daba prioridad al ejecutable de `dist/`.
+Ese binario se compiló en otra máquina y dentro de él **no existen** los módulos
+`gi` (GTK) ni `qtpy` (Qt). Tener Qt instalado en el sistema no basta: el
+ejecutable empaquetado no puede ver los paquetes de Python del sistema.
+
+**Solución (ya aplicada en el repo):** `./iniciar_sistema.sh` ahora usa primero
+el **código fuente** con `.venv`, donde sí se instalan `qtpy` y `PySide6`.
+Basta con:
+
+```bash
+cd UNESR_Horarios
+git pull origin main
+./iniciar_sistema.sh
+```
+
+Si todavía prefieres el binario, recompílalo **en tu PC** (así incluye Qt):
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt pyinstaller
+.venv/bin/python scripts/build_exe.py
+./iniciar_sistema.sh --binario
+```
+
+En Wayland puro (Cosmic, KDE Wayland), si Qt dice *“Could not load the Qt
+platform plugin 'wayland'”*, instala el plugin del sistema:
+
+```bash
+sudo pacman -S qt6-wayland      # CachyOS / Arch
+```
+
+Para forzar un backend y diagnosticar:
+
+```bash
+UNESR_GUI=qt   ./iniciar_sistema.sh     # fuerza Qt
+UNESR_GUI=gtk  ./iniciar_sistema.sh     # fuerza GTK (requiere python-gobject + webkit2gtk)
+UNESR_GUI=browser ./iniciar_sistema.sh  # solo navegador
+```
+
+El traceback completo se guarda en
+`~/.local/share/UNESR_Horarios/webview_error.log` (Windows:
+`%APPDATA%\UNESR_Horarios\webview_error.log`). Cualquier otro error de ventana
+también cae al navegador para que el sistema nunca quede inaccesible.
 
 ---
 

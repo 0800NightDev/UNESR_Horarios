@@ -51,6 +51,62 @@ def esperar_servidor(url: str, timeout: float = 60.0) -> bool:
     return False
 
 
+def elegir_gui() -> str | None:
+    """Devuelve el backend que se le pasará a ``webview.start``.
+
+    * ``UNESR_GUI=browser`` salta directamente al navegador.
+    * ``UNESR_GUI=qt|gtk|edgechromium`` fuerza uno concreto (diagnóstico).
+    * Windows usa WinForms + WebView2 (``edgechromium``), nunca Qt.
+    * Linux deja que pywebview pruebe GTK → Qt, salvo que sepamos de antemano
+      que GTK no está disponible y Qt sí: así evitamos el traceback de ``gi``.
+    """
+    import importlib.util
+
+    forzado = os.environ.get("UNESR_GUI", "").strip().lower()
+    if forzado:
+        return forzado if forzado != "browser" else "browser"
+    if sys.platform == "win32":
+        return "edgechromium"
+    if sys.platform.startswith("linux") and importlib.util.find_spec("qtpy") \
+            and not importlib.util.find_spec("gi"):
+        return "qt"
+    return None
+
+
+def registrar_error_gui(exc: BaseException) -> None:
+    """Guarda el traceback para poder diagnosticar el exe sin consola."""
+    import traceback
+
+    texto = (f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+             f"No se pudo abrir la ventana nativa\n"
+             + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+    print(texto, file=sys.stderr)
+    try:
+        ruta = db.base_escritura / "webview_error.log"
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(texto, encoding="utf-8")
+        print(f"Diagnóstico guardado en {ruta}", file=sys.stderr)
+    except Exception:
+        pass
+    if getattr(sys, "frozen", False) and not sys.platform.startswith("win32"):
+        print(
+            "Estás usando el binario compilado en otra máquina: dentro de él no "
+            "están los módulos 'gi' (GTK) ni 'qtpy' (Qt). Ejecuta "
+            "'./iniciar_sistema.sh' para usar el código fuente, o recompila "
+            "aquí con 'pip install -r requirements.txt'.",
+            file=sys.stderr,
+        )
+
+
+def abrir_en_navegador(url: str) -> None:
+    webbrowser.open(url)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        return
+
+
 def main() -> None:
     db.init_db()
     puerto = int(os.environ.get("UNESR_PORT", puerto_libre()))
@@ -81,19 +137,17 @@ def main() -> None:
 
     print(f"UNESR Horarios ejecutándose en {url}")
 
-    if modo == "--browser" or os.environ.get("UNESR_FORCE_BROWSER"):
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            return
+    gui = elegir_gui()
+    if modo == "--browser" or os.environ.get("UNESR_FORCE_BROWSER") or gui == "browser":
+        abrir_en_navegador(url)
+        return
 
-    # Escritorio nativo con pywebview.
+    # Escritorio nativo con pywebview. Si falla, dejamos el traceback en un
+    # archivo de diagnóstico y abrimos el navegador para no perder el acceso.
     try:
         import webview
 
-        window = webview.create_window(
+        webview.create_window(
             title="UNESR — Oferta Académica y Horarios · Núcleo Palo Verde",
             url=url,
             width=1360,
@@ -102,15 +156,11 @@ def main() -> None:
             resizable=True,
             background_color="#F8FAFC",
         )
-        webview.start(gui="edgechromium" if sys.platform == "win32" else None)
+        webview.start(**({"gui": gui} if gui else {}))
     except Exception as exc:  # pragma: no cover
-        print(f"No se pudo abrir la ventana nativa ({exc}). Abriendo en el navegador…")
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            return
+        registrar_error_gui(exc)
+        print(f"Abriendo en el navegador: {url}", file=sys.stderr)
+        abrir_en_navegador(url)
 
 
 if __name__ == "__main__":
